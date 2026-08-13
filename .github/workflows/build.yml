@@ -14,16 +14,19 @@ jobs:
 
       - name: Find the app file
         run: |
-          SRC=""
-          if [ -f index.html ]; then SRC=index.html; fi
-          if [ -f Trippin_App.html ]; then SRC=Trippin_App.html; fi
+          echo "===== FILES IN THIS REPOSITORY ====="
+          ls -la
+          find . -path ./.git -prune -o -type f -print | head -40
+          echo "===================================="
+          SRC=$(find . -path ./.git -prune -o -type f -iname "*.html" -print | head -1)
           if [ -z "$SRC" ]; then
-            echo "::error::No app file found. Upload Trippin_App.html to the top level of this repository, then run again."
+            echo "::error::No .html file anywhere in this repository. Upload the Trippin app HTML file, wait for the green Commit changes to finish, then run again."
             exit 1
           fi
+          echo "Using: $SRC"
           mkdir -p www
           cp "$SRC" www/index.html
-          echo "Using $SRC"
+          ls -la www
 
       - name: Create the iOS project
         run: |
