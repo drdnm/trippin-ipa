@@ -1,0 +1,60 @@
+name: Build Trippin IPA
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Find the app file
+        run: |
+          SRC=""
+          if [ -f index.html ]; then SRC=index.html; fi
+          if [ -f Trippin_App.html ]; then SRC=Trippin_App.html; fi
+          if [ -z "$SRC" ]; then
+            echo "::error::No app file found. Upload Trippin_App.html to the top level of this repository, then run again."
+            exit 1
+          fi
+          mkdir -p www
+          cp "$SRC" www/index.html
+          echo "Using $SRC"
+
+      - name: Create the iOS project
+        run: |
+          npm init -y
+          npm install @capacitor/core@7 @capacitor/cli@7 @capacitor/ios@7 --no-audit --no-fund
+          echo '{"appId":"com.trippin.app","appName":"Trippin","webDir":"www"}' > capacitor.config.json
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Build the app (unsigned)
+        run: |
+          if [ -d ios/App/App.xcworkspace ]; then
+            TARGET="-workspace ios/App/App.xcworkspace"
+          else
+            TARGET="-project ios/App/App.xcodeproj"
+          fi
+          xcodebuild $TARGET -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO DEVELOPMENT_TEAM="" \
+            clean archive
+
+      - name: Package the IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/App.xcarchive/Products/Applications/App.app Payload/
+          zip -qry Trippin-unsigned.ipa Payload
+          ls -la Trippin-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Trippin-unsigned-ipa
+          path: Trippin-unsigned.ipa
